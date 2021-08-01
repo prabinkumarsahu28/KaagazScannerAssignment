@@ -1,6 +1,7 @@
-package com.prabin.kagazscanner
+package com.prabin.kagazscanner.activities
 
 import android.Manifest
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment.DIRECTORY_PICTURES
@@ -12,8 +13,16 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
+import androidx.lifecycle.ViewModelProvider
+import com.bumptech.glide.Glide
 import com.google.common.util.concurrent.ListenableFuture
 import com.prabin.kagazscanner.databinding.ActivityMainBinding
+import com.prabin.kagazscanner.recyclerview.GalleryAdapter
+import com.prabin.kagazscanner.roomdb.CameraApplication
+import com.prabin.kagazscanner.roomdb.entities.ImageEntity
+import com.prabin.kagazscanner.roomdb.viewmodel.CameraViewModel
+import com.prabin.kagazscanner.roomdb.viewmodel.CameraViewModelFactory
+import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -28,6 +37,46 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val application = application as CameraApplication
+        val repo = application.cameraRepo
+        val viewModelFactory = CameraViewModelFactory(repo)
+        val viewModel = ViewModelProvider(this, viewModelFactory).get(CameraViewModel::class.java)
+
+        cameraPermission()
+        binding.btnCapture.setOnClickListener {
+            takePhoto(viewModel)
+        }
+
+        binding.galleryImage.setOnClickListener {
+            startActivity(Intent(this, GalleryActivity::class.java))
+        }
+    }
+
+    private fun takePhoto(viewModel: CameraViewModel) {
+        val photoFile = File(
+            getExternalFilesDir(DIRECTORY_PICTURES),
+            "KaagazScanner${System.currentTimeMillis()}.png"
+        )
+        val output = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        capture?.takePicture(output, ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    val imgLoc = Uri.fromFile(photoFile)
+                    Glide.with(this@MainActivity).load(imgLoc).into(gallery_image)
+                    Log.d("prabin", "$imgLoc")
+                    val imgName = photoFile.name.toString()
+                    val timeStamp = System.currentTimeMillis()
+                    viewModel.insertImage(ImageEntity(0, imgName, imgLoc.toString(), timeStamp))
+                    Toast.makeText(this@MainActivity, "Image Saved", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    Toast.makeText(this@MainActivity, "Error occurred", Toast.LENGTH_SHORT).show()
+                }
+            })
+    }
+
+    private fun cameraPermission() {
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
@@ -41,30 +90,6 @@ class MainActivity : AppCompatActivity() {
                 100
             )
         }
-        binding.btnCapture.setOnClickListener {
-            takePhoto()
-        }
-    }
-
-    private fun takePhoto() {
-        val photoFile = File(
-            getExternalFilesDir(DIRECTORY_PICTURES),
-            "KaagazScanner - ${System.currentTimeMillis()}.png"
-        )
-        val output = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-        capture?.takePicture(output, ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val savedUri = Uri.fromFile(photoFile)
-                    val msg = "Photo capture succeeded: $savedUri"
-                    Log.d("prabin", msg)
-//                    /storage/emulated/0/Android/data/com.prabin.kagazscanner/files/Pictures/KaagazScanner%20-%201627745922271.png
-                    Toast.makeText(this@MainActivity, "Image Saved", Toast.LENGTH_SHORT).show()
-                }
-                override fun onError(exception: ImageCaptureException) {
-                    Toast.makeText(this@MainActivity, "Error occurred", Toast.LENGTH_SHORT).show()
-                }
-            })
     }
 
     private fun startCamera() {
