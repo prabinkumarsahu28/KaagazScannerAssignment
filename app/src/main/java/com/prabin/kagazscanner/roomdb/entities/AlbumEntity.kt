@@ -1,10 +1,13 @@
 package com.prabin.kagazscanner.roomdb.entities
 
 
+import android.os.Parcelable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.android.parcel.Parcelize
 
+@Parcelize
 @Entity(tableName = "album_table")
 data class AlbumEntity(
 
@@ -14,8 +17,8 @@ data class AlbumEntity(
     @ColumnInfo(name = "albumImg")
     var albumImg: String
 
-) {
+) : Parcelable {
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
-    var albumId: Int? = null
+    var albumId: Long? = null
 }

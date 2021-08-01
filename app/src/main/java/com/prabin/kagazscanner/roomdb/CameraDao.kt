@@ -15,10 +15,10 @@ interface CameraDao {
     fun insertImage(imageEntity: ImageEntity)
 
     @Query("SELECT * FROM image_table where albumId =:albumId")
-    fun getImages(albumId: Int): LiveData<List<ImageEntity>>
+    fun getImages(albumId: Long): LiveData<List<ImageEntity>>
 
     @Insert
-    fun insertAlbum(albumEntity: AlbumEntity)
+    fun insertAlbum(albumEntity: AlbumEntity): Long
 
     @Query("SELECT * FROM album_table")
     fun getAlbums(): LiveData<List<AlbumEntity>>

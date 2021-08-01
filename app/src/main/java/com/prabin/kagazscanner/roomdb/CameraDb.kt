@@ -9,7 +9,7 @@ import com.prabin.kagazscanner.roomdb.entities.ImageEntity
 
 @Database(entities = [ImageEntity::class, AlbumEntity::class], version = 1)
 abstract class CameraDb : RoomDatabase() {
-    abstract fun getCameraDao():CameraDao
+    abstract fun getCameraDao(): CameraDao
 
     companion object {
         private var database: CameraDb? = null

@@ -14,11 +14,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.lifecycle.ViewModelProvider
-import com.bumptech.glide.Glide
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.common.util.concurrent.ListenableFuture
 import com.prabin.kagazscanner.databinding.ActivityMainBinding
-import com.prabin.kagazscanner.recyclerview.GalleryAdapter
+import com.prabin.kagazscanner.recyclerview.PreviewAdapter
 import com.prabin.kagazscanner.roomdb.CameraApplication
+import com.prabin.kagazscanner.roomdb.entities.AlbumEntity
 import com.prabin.kagazscanner.roomdb.entities.ImageEntity
 import com.prabin.kagazscanner.roomdb.viewmodel.CameraViewModel
 import com.prabin.kagazscanner.roomdb.viewmodel.CameraViewModelFactory
@@ -31,27 +32,58 @@ class MainActivity : AppCompatActivity() {
     private var camera: Camera? = null
     private var preview: Preview? = null
     private var capture: ImageCapture? = null
+    private val imageList = arrayListOf<ImageEntity>()
+    private lateinit var adapter: PreviewAdapter
+    private var albumId: Long? = null
+    private var albumName: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        supportActionBar?.hide()
 
         val application = application as CameraApplication
         val repo = application.cameraRepo
         val viewModelFactory = CameraViewModelFactory(repo)
         val viewModel = ViewModelProvider(this, viewModelFactory).get(CameraViewModel::class.java)
 
+        if (intent != null && intent.extras != null) {
+            albumId = intent.getLongExtra("albumId", 0)
+            albumName = intent.getStringExtra("albumName")
+        }
+        Log.d("prabin1", "$albumId")
+
         cameraPermission()
-        binding.btnCapture.setOnClickListener {
-            takePhoto(viewModel)
+        setRecyclerView()
+        clickListeners(viewModel)
+
+    }
+
+    private fun clickListeners(viewModel: CameraViewModel) {
+        btnSave.setOnClickListener {
+            val intent = Intent(this, HomeActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            startActivity(intent)
         }
 
-        binding.galleryImage.setOnClickListener {
-            startActivity(Intent(this, GalleryActivity::class.java))
+        binding.btnCapture.setOnClickListener {
+            takePhoto(viewModel)
+            binding.rvMain.scrollToPosition(adapter.itemCount - 1)
         }
     }
 
+    private fun setRecyclerView() {
+        adapter = PreviewAdapter(imageList)
+        binding.rvMain.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvMain.adapter = adapter
+    }
+
+    /**
+     * on click of capture button is function executes.
+     * this function clicks picture and stores image in database.
+     */
     private fun takePhoto(viewModel: CameraViewModel) {
         val photoFile = File(
             getExternalFilesDir(DIRECTORY_PICTURES),
@@ -62,12 +94,16 @@ class MainActivity : AppCompatActivity() {
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     val imgLoc = Uri.fromFile(photoFile)
-                    Glide.with(this@MainActivity).load(imgLoc).into(gallery_image)
                     Log.d("prabin", "$imgLoc")
                     val imgName = photoFile.name.toString()
                     val timeStamp = System.currentTimeMillis()
-                    viewModel.insertImage(ImageEntity(0, imgName, imgLoc.toString(), timeStamp))
-                    Toast.makeText(this@MainActivity, "Image Saved", Toast.LENGTH_SHORT).show()
+                    val imageEntity = ImageEntity(albumId!!, imgName, imgLoc.toString(), timeStamp)
+                    imageList.add(imageEntity)
+                    adapter.notifyItemInserted(imageList.size)
+                    viewModel.insertImage(imageEntity)
+                    val albumEntity = AlbumEntity(albumName!!, imgLoc.toString())
+                    albumEntity.albumId = albumId
+                    viewModel.updateAlbumImg(albumEntity)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -76,6 +112,9 @@ class MainActivity : AppCompatActivity() {
             })
     }
 
+    /**
+     * this function takes user permission of camera to use camera inside the application
+     */
     private fun cameraPermission() {
         if (ContextCompat.checkSelfPermission(
                 this,
@@ -92,6 +131,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * if camera permission is granted then this function starts the camera
+     */
     private fun startCamera() {
         val cameraProviderFuture: ListenableFuture<ProcessCameraProvider> =
             ProcessCameraProvider.getInstance(this)
